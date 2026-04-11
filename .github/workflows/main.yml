@@ -1,0 +1,23 @@
+name: Run Job Scraper
+on:
+  schedule:
+    - cron: '0 9 * * *' # Roda todo dia às 9h da manhã
+  workflow_dispatch: # Permite que você rode manualmente clicando num botão
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+      - name: Run scraper
+        env:
+          WP_USERNAME: ${{ secrets.WP_USERNAME }}
+          WP_PASSWORD: ${{ secrets.WP_PASSWORD }}
+          WP_URL: ${{ secrets.WP_URL }}
+        run: python scraper.py
