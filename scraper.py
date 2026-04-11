@@ -1,79 +1,66 @@
 import requests
 from bs4 import BeautifulSoup
-import base64
-import json
-from datetime import datetime
+import os
 
-# ── CONFIGURAÇÕES ──────────────────────────────────────────
-WP_URL      = "https://opportunityfinds.com"
-WP_USER     = "seu-usuario-editor"
-WP_APP_PASS = "xxxx xxxx xxxx xxxx xxxx xxxx"  # Application Password do WP
-
-REMOTE_CO_URL = "https://remote.co/remote-jobs/"
-# ──────────────────────────────────────────────────────────
-
-def get_auth_header():
-    token = base64.b64encode(f"{WP_USER}:{WP_APP_PASS}".encode()).decode()
-    return {"Authorization": f"Basic {token}"}
+# Configurações do WordPress vindas dos Secrets
+WP_USER = os.getenv('WP_USERNAME')
+WP_PASS = os.getenv('WP_PASSWORD')
+WP_URL = os.getenv('WP_URL')
 
 def scrape_jobs():
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(REMOTE_CO_URL, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+    # URL do site de vagas (exemplo)
+    url = "https://remote.co/remote-jobs/it"
     
-    jobs = []
-    # Seleciona os cards de vagas
-    for card in soup.select(".job_listing"):
-        title    = card.select_one(".position h2")
-        company  = card.select_one(".company_name")
-        link     = card.get("data-href") or card.select_one("a")["href"]
-        category = card.select_one(".job-type")
-        
-        if title:
-            jobs.append({
-                "title":    title.get_text(strip=True),
-                "company":  company.get_text(strip=True) if company else "N/A",
-                "link":     link,
-                "category": category.get_text(strip=True) if category else "Remote",
-            })
-    return jobs
+    # DISFARCE: Isso faz o site achar que é um navegador Chrome real
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://google.com'
+    }
 
-def post_job_to_wp(job):
-    endpoint = f"{WP_URL}/wp-json/wp/v2/job-listings"
-    
-    payload = {
-        "title":   job["title"],
-        "status":  "publish",
-        "content": f"""
-            <p><strong>Empresa:</strong> {job['company']}</p>
-            <p><strong>Tipo:</strong> {job['category']}</p>
-            <p><strong>Candidatar-se:</strong> 
-               <a href='{job['link']}' target='_blank'>Ver vaga completa no Remote.co</a>
-            </p>
-        """,
-        "meta": {
-            "_job_location":    "Remote",
-            "_application":     job["link"],
-            "_company_name":    job["company"],
-            "_job_expires":     "",
-        }
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        jobs = []
+        
+        # Aqui o bot procura os títulos das vagas (ajustado para o site remote.co)
+        for job_card in soup.find_all('a', class_='card'):
+            title_tag = job_card.find('span', class_='font-weight-bold')
+            if title_tag:
+                jobs.append({
+                    'title': title_tag.get_text(strip=True),
+                    'content': f"Vaga encontrada no site original. Confira no link: {url}"
+                })
+        return jobs
+    except Exception as e:
+        print(f"Erro ao acessar site de vagas: {e}")
+        return []
+
+def post_to_wordpress(title, content):
+    data = {
+        'title': title,
+        'content': content,
+        'status': 'publish'
     }
     
-    r = requests.post(
-        endpoint,
-        headers={**get_auth_header(), "Content-Type": "application/json"},
-        data=json.dumps(payload)
-    )
-    return r.status_code, r.json().get("id", "erro")
+    response = requests.post(WP_URL, json=data, auth=(WP_USER, WP_PASS))
+    
+    if response.status_code == 201:
+        print(f"Postado com sucesso: {title}")
+    else:
+        print(f"Erro ao postar: {response.status_code} - {response.text}")
 
 def run():
-    print(f"[{datetime.now()}] Iniciando coleta de vagas...")
-    jobs = scrape_jobs()
-    print(f"  → {len(jobs)} vagas encontradas")
-    
-    for job in jobs:
-        status, job_id = post_job_to_wp(job)
-        print(f"  ✓ '{job['title']}' → status {status}, ID {job_id}")
+    print("Iniciando busca de vagas...")
+    vagas = scrape_jobs()
+    if not vagas:
+        print("Nenhuma vaga nova encontrada ou site bloqueou o acesso.")
+        return
+        
+    for vaga in vagas[:3]: # Posta apenas as 3 primeiras para testar
+        post_to_wordpress(vaga['title'], vaga['content'])
 
 if __name__ == "__main__":
     run()
