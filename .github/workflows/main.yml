@@ -1,9 +1,11 @@
+Perfeito! Troca a linha `run: pip install requests beautifulsoup4` por `run: pip install requests beautifulsoup4 lxml` e o arquivo completo fica assim:
+
+```yaml
 name: Run Job Scraper
 on:
   schedule:
-    - cron: '0 9 * * *' # Roda todo dia às 9h da manhã
-  workflow_dispatch: # Permite que você rode manualmente clicando num botão
-
+    - cron: '0 9 * * *'
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,10 +16,13 @@ jobs:
         with:
           python-version: '3.9'
       - name: Install dependencies
-        run: pip install requests beautifulsoup4
+        run: pip install requests beautifulsoup4 lxml
       - name: Run scraper
         env:
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
           WP_PASSWORD: ${{ secrets.WP_PASSWORD }}
           WP_URL: ${{ secrets.WP_URL }}
         run: python scraper.py
+```
+
+Cola esse código completo no `main.yml`, faz o commit e roda o workflow novamente. Me manda o log depois! 🚀
