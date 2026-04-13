@@ -30,7 +30,7 @@ def scrape_jobs():
         try:
             response = requests.get(feed_url, headers=HEADERS, timeout=20)
             response.raise_for_status()
-            soup = BeautifulSoup(response.content, 'xml')
+            soup = BeautifulSoup(response.content, 'html.parser')
             items = soup.find_all('item')[:8]
 
             for item in items:
