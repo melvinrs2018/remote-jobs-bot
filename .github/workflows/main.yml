@@ -1,6 +1,3 @@
-Perfeito! Troca a linha `run: pip install requests beautifulsoup4` por `run: pip install requests beautifulsoup4 lxml` e o arquivo completo fica assim:
-
-```yaml
 name: Run Job Scraper
 on:
   schedule:
@@ -23,6 +20,3 @@ jobs:
           WP_PASSWORD: ${{ secrets.WP_PASSWORD }}
           WP_URL: ${{ secrets.WP_URL }}
         run: python scraper.py
-```
-
-Cola esse código completo no `main.yml`, faz o commit e roda o workflow novamente. Me manda o log depois! 🚀
