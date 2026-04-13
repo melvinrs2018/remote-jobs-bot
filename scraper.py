@@ -2,9 +2,13 @@ import requests
 import os
 import time
 
-WP_USER = os.getenv('WP_USERNAME')
-WP_PASS = os.getenv('WP_PASSWORD')
-WP_URL  = os.getenv('WP_URL')
+# Pega as variáveis e remove espaços extras que podem vir do segredo do GitHub
+WP_USER = os.getenv('WP_USERNAME', '').strip()
+WP_PASS = os.getenv('WP_PASSWORD', '').strip()
+WP_URL  = os.getenv('WP_URL', '').strip().rstrip('/')
+
+# AJUSTE CHAVE: URL da API com rota forçada para evitar o Erro 404
+API_URL = f"{WP_URL}/index.php?rest_route=/wp/v2/job_listing"
 
 def get_jobs():
     print("Buscando vagas na API do Remotive...")
@@ -23,8 +27,9 @@ def get_jobs():
 
 def get_existing_titles():
     try:
+        # Usando a rota forçada também para leitura
         resp = requests.get(
-            f"{WP_URL}/wp-json/wp/v2/job_listing",
+            API_URL,
             params={"per_page": 100, "_fields": "title"},
             auth=(WP_USER, WP_PASS),
             timeout=10
@@ -33,6 +38,8 @@ def get_existing_titles():
             titles = {i["title"]["rendered"].lower() for i in resp.json()}
             print(f"Vagas ja no site: {len(titles)}")
             return titles
+        else:
+            print(f"Aviso ao buscar existentes (Status {resp.status_code})")
     except Exception as e:
         print(f"Aviso: {e}")
     return set()
@@ -43,10 +50,11 @@ def post_job(job):
     location = job.get("candidate_required_location", "Remote Worldwide")
     apply_url = job.get("url", "")
     salary = job.get("salary", "")
+    
     description = f"""
 <p><strong>{company}</strong> — {location}</p>
 {"<p>💰 " + salary + "</p>" if salary else ""}
-<p>{job.get("description", "")[:500]}</p>
+<p>{job.get("description", "")[:500]}...</p>
 <p><a href="{apply_url}" target="_blank">Apply here →</a></p>
 """
     data = {
@@ -61,8 +69,9 @@ def post_job(job):
         }
     }
     try:
+        # POST enviando para a rota forçada
         resp = requests.post(
-            f"{WP_URL}/wp-json/wp/v2/job_listing",
+            API_URL,
             json=data,
             auth=(WP_USER, WP_PASS),
             timeout=15
@@ -82,9 +91,13 @@ def run():
     print("OpportunityFinds Bot — API Remotive")
     print("=" * 48)
 
+    if not WP_USER or not WP_PASS or not WP_URL:
+        print("ERRO: Variáveis de ambiente WP_USERNAME, WP_PASSWORD ou WP_URL não configuradas.")
+        return
+
     jobs = get_jobs()
     if not jobs:
-        print("Nenhuma vaga encontrada.")
+        print("Nenhuma vaga encontrada na fonte.")
         return
 
     existing = get_existing_titles()
@@ -92,10 +105,11 @@ def run():
     print(f"Vagas novas para postar: {len(novas)}")
 
     sucesso = 0
+    # Limita a 20 postagens por vez para evitar bloqueios do servidor
     for job in novas[:20]:
         if post_job(job):
             sucesso += 1
-        time.sleep(1)
+        time.sleep(1) # Delay de segurança
 
     print(f"Concluido! {sucesso} vagas postadas.")
 
